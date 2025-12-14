@@ -4,6 +4,7 @@ import {
   InfoWindow,
   DirectionsRenderer,
   useJsApiLoader,
+  Autocomplete,
 } from "@react-google-maps/api";
 import { useState, useEffect } from "react";
 import NearbyFilters from "./components/NearbyFilters";
@@ -18,13 +19,14 @@ export default function App() {
   const [minRating, setMinRating] = useState(0);
   const [mapType, setMapType] = useState("roadmap");
   const [directions, setDirections] = useState(null);
+  const [searchBox, setSearchBox] = useState(null);
 
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: "YOUR_API_KEY",
+    googleMapsApiKey: "YOUR_GOOGLE_API_KEY",
     libraries,
   });
 
-  // Получаем геолокацию
+  // Геолокация
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -39,7 +41,24 @@ export default function App() {
     );
   }, []);
 
-  // ---- ЗАГРУЗКА МЕСТ ----
+  // Autocomplete
+  const onPlaceChanged = () => {
+    if (!searchBox) return;
+
+    const place = searchBox.getPlace();
+    if (!place.geometry) return;
+
+    setPosition({
+      lat: place.geometry.location.lat(),
+      lng: place.geometry.location.lng(),
+    });
+
+    setPlaces([]);
+    setDirections(null);
+    setSelectedPlace(null);
+  };
+
+  // Загрузка мест
   const loadPlaces = () => {
     if (!position) return;
 
@@ -51,7 +70,6 @@ export default function App() {
       location: position,
       radius: 3000,
       type: placeType || "restaurant",
-      // openNow: true — можно включить если нужно
     };
 
     service.nearbySearch(request, (results, status) => {
@@ -63,14 +81,18 @@ export default function App() {
         service.getDetails(
           {
             placeId: place.place_id,
-            fields: ["name", "geometry", "vicinity", "rating", "photos"],
+            fields: [
+              "name",
+              "geometry",
+              "vicinity",
+              "rating",
+              "photos",
+              "opening_hours",
+            ],
           },
           (details, dStatus) => {
             if (dStatus === "OK") {
-              fullData.push({
-                ...place,
-                photos: details.photos,
-              });
+              fullData.push({ ...place, ...details });
             } else {
               fullData.push(place);
             }
@@ -84,11 +106,11 @@ export default function App() {
     });
   };
 
-  // Построение маршрута
+  // Маршрут
   const buildRoute = (place) => {
-    const directionsService = new window.google.maps.DirectionsService();
+    const service = new window.google.maps.DirectionsService();
 
-    directionsService.route(
+    service.route(
       {
         origin: position,
         destination: {
@@ -98,28 +120,40 @@ export default function App() {
         travelMode: window.google.maps.TravelMode.DRIVING,
       },
       (result, status) => {
-        if (status === "OK") {
-          setDirections(result);
-        }
+        if (status === "OK") setDirections(result);
       }
     );
   };
 
-  if (!isLoaded || !position) return <h2>Загрузка карты...</h2>;
+  if (!isLoaded || !position) return <h2>Loading map…</h2>;
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
-      {/* -------- ЛЕВОЕ МЕНЮ -------- */}
+      {/* ---------- SIDEBAR ---------- */}
       <div
         style={{
-          width: "350px",
-          padding: "15px",
-          borderRight: "1px solid #ccc",
+          width: "360px",
+          padding: "18px",
+          background: "#f5f7fb",
           overflowY: "auto",
-          background: "#fafafa",
+          borderRight: "1px solid #ddd",
         }}
       >
-        <h2>Рестораны рядом</h2>
+        <h2>📍 Places Nearby</h2>
+
+        <Autocomplete onLoad={setSearchBox} onPlaceChanged={onPlaceChanged}>
+          <input
+            type="text"
+            placeholder="Search for a city or place…"
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "10px",
+              border: "1px solid #ccc",
+              marginBottom: "15px",
+            }}
+          />
+        </Autocomplete>
 
         <button
           onClick={loadPlaces}
@@ -128,71 +162,59 @@ export default function App() {
             padding: "12px",
             background: "#4285F4",
             color: "white",
-            borderRadius: "6px",
-            marginBottom: "20px",
+            borderRadius: "10px",
             border: "none",
             cursor: "pointer",
+            marginBottom: "20px",
           }}
         >
-          Сканировать
+          🔍 Scan
         </button>
 
-        {/* Фильтры */}
         <NearbyFilters selectedType={placeType} onChange={setPlaceType} />
 
-        <h4>Режим карты</h4>
-        <button onClick={() => setMapType("roadmap")}>Дорожная</button>
-        <button onClick={() => setMapType("satellite")}>Спутник</button>
-        <button onClick={() => setMapType("hybrid")}>Гибрид</button>
-
-        <h4 style={{ marginTop: "15px" }}>Фильтр рейтинга</h4>
+        <h4>Rating filter</h4>
         <select
           value={minRating}
           onChange={(e) => setMinRating(Number(e.target.value))}
           style={{
             width: "100%",
             padding: "8px",
-            borderRadius: "6px",
+            borderRadius: "8px",
             marginBottom: "20px",
           }}
         >
-          <option value={0}>Все</option>
-          <option value={4.0}>4.0+</option>
+          <option value={0}>All</option>
+          <option value={4}>4.0+</option>
           <option value={4.5}>4.5+</option>
-          <option value={5}>5.0</option>
         </select>
 
-        {/* Список мест */}
         {places
           .filter((p) => !p.rating || p.rating >= minRating)
           .map((place, idx) => (
             <div
               key={idx}
               style={{
-                background: "white",
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #ddd",
-                marginBottom: "15px",
+                background: "#fff",
+                padding: "14px",
+                borderRadius: "14px",
+                marginBottom: "18px",
+                boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
               }}
             >
               <h4>{place.name}</h4>
               <p>⭐ {place.rating || "—"}</p>
+              <p>
+                {place.opening_hours?.open_now ? "🟢 Open" : "🔴 Closed"}
+              </p>
 
               {place.photos ? (
                 <img
-                  src={place.photos[0].getUrl({ maxWidth: 200 })}
-                  style={{ width: "100%", borderRadius: "8px" }}
+                  src={place.photos[0].getUrl({ maxWidth: 250 })}
+                  style={{ width: "100%", borderRadius: "10px" }}
                 />
               ) : (
-                <div
-                  style={{
-                    width: "100%",
-                    height: "120px",
-                    background: "#eee",
-                    borderRadius: "8px",
-                  }}
-                ></div>
+                <div style={{ height: "120px", background: "#eee" }} />
               )}
 
               <button
@@ -201,22 +223,23 @@ export default function App() {
                   buildRoute(place);
                 }}
                 style={{
+                  width: "100%",
                   marginTop: "10px",
                   padding: "8px",
                   background: "#4CAF50",
                   color: "white",
                   border: "none",
-                  borderRadius: "6px",
+                  borderRadius: "8px",
                   cursor: "pointer",
                 }}
               >
-                Показать на карте + маршрут
+                🧭 Route
               </button>
             </div>
           ))}
       </div>
 
-      {/* -------- КАРТА -------- */}
+      {/* ---------- MAP ---------- */}
       <div style={{ flex: 1 }}>
         <GoogleMap
           center={position}
@@ -240,7 +263,6 @@ export default function App() {
             />
           ))}
 
-          {/* Инфо окно */}
           {selectedPlace && (
             <InfoWindow
               position={{
@@ -249,16 +271,8 @@ export default function App() {
               }}
               onCloseClick={() => setSelectedPlace(null)}
             >
-              <div style={{ width: "220px" }}>
+              <div>
                 <h3>{selectedPlace.name}</h3>
-
-                {selectedPlace.photos && (
-                  <img
-                    src={selectedPlace.photos[0].getUrl({ maxWidth: 200 })}
-                    style={{ width: "100%", borderRadius: "8px" }}
-                  />
-                )}
-
                 {directions && (
                   <p>
                     🚗 {directions.routes[0].legs[0].distance.text} <br />

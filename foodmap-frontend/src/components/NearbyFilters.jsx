@@ -1,15 +1,16 @@
 export default function NearbyFilters({ selectedType, onChange }) {
   const types = [
-    { value: "restaurant", label: "🍽 Рестораны" },
-    { value: "cafe", label: "☕ Кафе" },
-    { value: "store", label: "🛍 Магазины" },
-    { value: "gas_station", label: "⛽ АЗС" },
-    { value: "hospital", label: "🏥 Больницы" },
+    { value: "restaurant", label: "🍽 Restaurants" },
+    { label: "🏨 Hotels", value: "lodging" },
+    { value: "cafe", label: "☕ Cafés" },
+    { value: "store", label: "🛍 Shops" },
+    { value: "gas_station", label: "⛽ Gas stations" },
+    { value: "hospital", label: "🏥 Hospitals" },
   ];
 
   return (
     <div style={{ marginTop: "20px" }}>
-      <h3>Фильтр мест рядом</h3>
+      <h3>Nearby places filter</h3>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {types.map((t) => (
@@ -43,7 +44,7 @@ export default function NearbyFilters({ selectedType, onChange }) {
             textAlign: "left",
           }}
         >
-          🔄 Показать всё
+          🔄 Show all
         </button>
       </div>
     </div>
