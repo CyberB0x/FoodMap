@@ -37,12 +37,6 @@ The app helps users find nearby restaurants, cafes, shops, hotels, and other poi
 
 ---
 
-## 📸 Screenshots
-
-_Add screenshots of the application interface here_
-
----
-
 ## ⚙️ Installation
 
 ```bash
